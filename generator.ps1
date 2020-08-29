@@ -1,0 +1,1 @@
+statik -f -src=web/  -include=*.jpg,*.txt,*.html,*.css,*.js 
