@@ -27,10 +27,7 @@
             </div>
             <div style="width: 598px;border:  1px solid gray; height: 300px;overflow: scroll;float: left;" id='msglist'>
                 <p v-for="msg in msgList">{{msg.username}}:{{msg.message}}</p>
-                
-                <br/>
-                <br/>
-                <br/>
+
             </div>
         </div>
         <br>
@@ -51,18 +48,22 @@
         data: {
             userList: [],
             msgList: [],
-            sendMsg: ""
+            sendMsg: "",
+            action: {
+                send: false
+            }
         },
         methods: {
             addMessageToMsgList: function (username = "未名人", message = "") {
                 console.log(username, message);
                 this.msgList.push({ username: username, message: message })
                 // @todo this.msgListTop 调用的时机晚于for循环的重置，导致定位至倒数第二行，而非倒数第一行
-                this.msgListTop() 
+                // this.msgListTop()
             },
             send: function () {
                 sendMsg({ 'content': this.sendMsg, 'type': 'user' })
                 this.sendMsg = ""
+                this.action.send = true
             },
             dealUser: function () {
 
@@ -70,6 +71,16 @@
             msgListTop: function () {
                 var user_list = document.getElementById("msglist");
                 user_list.scrollTop = user_list.scrollHeight;
+            }
+        },
+        watch: {
+            msgList: function () {
+                this.$nextTick(() => {
+                    if (this.action.send) {
+                        this.msgListTop()
+                        this.action.send = false;
+                    }
+                })
             }
         }
     })
