@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <title></title>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8">
+    <style>
+        p {
+            text-align: left;
+            padding-left: 20px;
+        }
+    </style>
+    <script src="vue.js"></script>
+</head>
+
+<body>
+    <div style="width: 800px;height: 600px;margin: 30px auto;text-align: center" id="app">
+        <h1>演示聊天室</h1>
+        <div style="width: 800px;border: 1px solid gray;height: 300px;">
+            <div style="width: 200px;height: 300px;float: left;text-align: left;">
+                <p><span>当前在线:</span><span>0</span></p>
+                <div style="overflow: auto;">
+                    <p v-for="user in userList">
+                        {{ user.username }}
+                    </p>
+                </div>
+            </div>
+            <div style="width: 598px;border:  1px solid gray; height: 300px;overflow: scroll;float: left;" id='msglist'>
+                <p v-for="msg in msgList">{{msg.username}}:{{msg.message}}</p>
+                
+                <br/>
+                <br/>
+                <br/>
+            </div>
+        </div>
+        <br>
+        <label for="msg_box"></label>
+        <label>
+            <textarea rows="6" cols="50" v-on:keyup.enter="send()" v-model="sendMsg"></textarea>
+        </label><br>
+        <input type="button" value="发送" v-on:click="send">
+    </div>
+</body>
+
+</html>
+
+<script>
+
+    var app = new Vue({
+        el: '#app',
+        data: {
+            userList: [],
+            msgList: [],
+            sendMsg: ""
+        },
+        methods: {
+            addMessageToMsgList: function (username = "未名人", message = "") {
+                console.log(username, message);
+                this.msgList.push({ username: username, message: message })
+                // @todo this.msgListTop 调用的时机晚于for循环的重置，导致定位至倒数第二行，而非倒数第一行
+                this.msgListTop() 
+            },
+            send: function () {
+                sendMsg({ 'content': this.sendMsg, 'type': 'user' })
+                this.sendMsg = ""
+            },
+            dealUser: function () {
+
+            },
+            msgListTop: function () {
+                var user_list = document.getElementById("msglist");
+                user_list.scrollTop = user_list.scrollHeight;
+            }
+        }
+    })
+
+    let uName = 'user' + uuid(8, 16);
+    app.userList.push({ username: uName })
+
+    var ws = new WebSocket("ws://127.0.0.1:8080/ws");
+    ws.onopen = function () {
+        var data = "建立连接成功";
+        app.addMessageToMsgList("系统消息", data);
+    };
+    ws.onmessage = function (e) {
+
+        var msg = JSON.parse(e.data);
+        console.log(msg)
+        var sender, user_name, name_list, change_type;
+        switch (msg.type) {
+            case 'system':
+                sender = '系统消息';
+                break;
+            case 'user':
+                sender = msg.from;
+                break;
+            case 'handshake':
+                var user_info = { 'type': 'login', 'content': uName };
+                sendMsg(user_info);
+                return;
+            case 'login':
+            case 'logout':
+                user_name = msg.content;
+                name_list = msg.userList;
+                name_list = name_list.map(item => ({ username: item }))
+                app.userList = name_list
+                change_type = msg.type;
+                app.dealUser(user_name, change_type, name_list);
+                return;
+        }
+        var data = sender + msg.content;
+        console.log(sender, msg.content);
+        app.addMessageToMsgList(sender, msg.content);
+    };
+    ws.onerror = function () {
+        app.addMessageToMsgList("系统消息", "出错了,请退出重试");
+    };
+
+    function sendMsg(msg) {
+        var data = JSON.stringify(msg);
+        ws.send(data);
+    }
+
+    function uuid(len, radix) {
+        var chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'.split('');
+        var uuid = [], i;
+        radix = radix || chars.length;
+        if (len) {
+            for (i = 0; i < len; i++) uuid[i] = chars[0 | Math.random() * radix];
+        } else {
+            var r;
+            uuid[8] = uuid[13] = uuid[18] = uuid[23] = '-';
+            uuid[14] = '4';
+            for (i = 0; i < 36; i++) {
+                if (!uuid[i]) {
+                    r = 0 | Math.random() * 16;
+                    uuid[i] = chars[(i == 19) ? (r & 0x3) | 0x8 : r];
+                }
+            }
+        }
+        return uuid.join('');
+    }
+</script>

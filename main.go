@@ -19,10 +19,10 @@ func main() {
 	// websocketStart()
 	// ginRun()
 	// statikFSStart()
-	mainInit()
+	simpleChatroomRun()
 }
 
-func mainInit() {
+func simpleChatroomRun() {
 	r := gin.Default()
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -31,19 +31,26 @@ func mainInit() {
 	})
 	go h.run()
 	r.GET("/ws", upgradeHTTP2Websocket)
-	statikFS, err := fs.New()
-	if err != nil {
-		log.Fatal(err)
+
+	dev := true
+	if dev {
+		r.GET("/", func(c *gin.Context) {
+			c.Request.URL.Path = "/public"
+			r.HandleContext(c)
+		})
+		r.Static("/public", "./web")
+	} else {
+		statikFS, err := fs.New()
+		if err != nil {
+			log.Fatal(err)
+		}
+		// Serve the contents over HTTP.
+		//http.Handle("/public", http.StripPrefix("/public", http.FileServer(statikFS)))
+		r.StaticFS("/public", statikFS)
 	}
-	// Serve the contents over HTTP.
-	http.Handle("/public", http.StripPrefix("/public", http.FileServer(statikFS)))
-
-	// r.Static("/public", "./web")
-	r.StaticFS("/public", statikFS)
 
 	// Serve the contents over HTTP.
-
-	r.Run()
+	_ = r.Run()
 }
 
 func statikFSStart() {
@@ -53,7 +60,7 @@ func statikFSStart() {
 	}
 	// Serve the contents over HTTP.
 	http.Handle("/public", http.StripPrefix("/public", http.FileServer(statikFS)))
-	http.ListenAndServe(":8080", nil)
+	_ = http.ListenAndServe(":8080", nil)
 }
 func ginRun() {
 	r := gin.Default()
@@ -62,14 +69,14 @@ func ginRun() {
 			"message": "pong",
 		})
 	})
-	r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
+	_ = r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
 }
 func websocketStart() {
-	fs := http.FileServer(http.Dir("./web"))
+	fsHandler := http.FileServer(http.Dir("./web"))
 	router := mux.NewRouter()
 	go h.run()
 	router.HandleFunc("/ws", myws)
-	router.Handle("/", fs)
+	router.Handle("/", fsHandler)
 	if err := http.ListenAndServe("127.0.0.1:8080", router); err != nil {
 		fmt.Println("err:", err)
 	}
@@ -158,6 +165,8 @@ func upgradeHTTP2Websocket(ginc *gin.Context) {
 	go c.writer()
 	c.reader()
 	defer func() {
+
+		fmt.Println("若无此句貌似不执行，有bug，貌似影响后续删除操作了")
 		c.data.Type = "logout"
 		userList = del(userList, c.data.User)
 		c.data.UserList = userList
@@ -190,9 +199,9 @@ func myws(w http.ResponseWriter, r *http.Request) {
 
 func (c *connection) writer() {
 	for message := range c.sc {
-		c.ws.WriteMessage(websocket.TextMessage, message)
+		_ = c.ws.WriteMessage(websocket.TextMessage, message)
 	}
-	c.ws.Close()
+	_ = c.ws.Close()
 }
 
 var userList = []string{}
@@ -204,7 +213,7 @@ func (c *connection) reader() {
 			h.r <- c
 			break
 		}
-		json.Unmarshal(message, &c.data)
+		_ = json.Unmarshal(message, &c.data)
 		switch c.data.Type {
 		case "login":
 			c.data.User = c.data.Content

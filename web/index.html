@@ -36,6 +36,7 @@
         listMsg(data);
     };
     ws.onmessage = function (e) {
+        console.log(e);
         var msg = JSON.parse(e.data);
         var sender, user_name, name_list, change_type;
         switch (msg.type) {
